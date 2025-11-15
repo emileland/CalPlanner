@@ -3,6 +3,9 @@ const { randomBytes } = require('crypto');
 const { query } = require('../config/db');
 const calendarService = require('./calendarService');
 
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 19;
+
 let projectColumnsPromise = null;
 
 const ensureProjectColumns = async () => {
@@ -24,17 +27,17 @@ const ensureProjectColumns = async () => {
     `);
     await query(`
       UPDATE projects
-      SET public_ics_token = md5(random()::text || clock_timestamp()::text)
+      SET public_ics_token = UUID()
       WHERE public_ics_token IS NULL
     `);
     await query(`
       UPDATE projects
-      SET view_start_hour = 7
+      SET view_start_hour = ${DEFAULT_START_HOUR}
       WHERE view_start_hour IS NULL
     `);
     await query(`
       UPDATE projects
-      SET view_end_hour = 19
+      SET view_end_hour = ${DEFAULT_END_HOUR}
       WHERE view_end_hour IS NULL
     `);
   })().catch((error) => {
@@ -44,27 +47,46 @@ const ensureProjectColumns = async () => {
   return projectColumnsPromise;
 };
 
+const mapProject = (row) => {
+  if (!row) {
+    return null;
+  }
+  return {
+    ...row,
+    view_start_hour:
+      typeof row.view_start_hour === 'number' ? row.view_start_hour : DEFAULT_START_HOUR,
+    view_end_hour: typeof row.view_end_hour === 'number' ? row.view_end_hour : DEFAULT_END_HOUR,
+  };
+};
+
 const listByUser = async (username) => {
   await ensureProjectColumns();
   const { rows } = await query(
     `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token, view_start_hour, view_end_hour
      FROM projects
-     WHERE username = $1
+     WHERE username = ?
      ORDER BY created_at DESC`,
     [username],
   );
-  return rows;
+  return rows.map(mapProject);
 };
 
-const create = async ({ username, name, start_date, end_date, view_start_hour = 7, view_end_hour = 19 }) => {
+const create = async ({
+  username,
+  name,
+  start_date,
+  end_date,
+  view_start_hour = DEFAULT_START_HOUR,
+  view_end_hour = DEFAULT_END_HOUR,
+}) => {
   await ensureProjectColumns();
-  const { rows } = await query(
+  const token = randomBytes(24).toString('hex');
+  const result = await query(
     `INSERT INTO projects (username, name, start_date, end_date, public_ics_token, view_start_hour, view_end_hour)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING project_id, username, name, start_date, end_date, created_at, public_ics_token, view_start_hour, view_end_hour`,
-    [username, name, start_date, end_date, randomBytes(24).toString('hex'), view_start_hour, view_end_hour],
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [username, name, start_date, end_date, token, view_start_hour, view_end_hour],
   );
-  return rows[0];
+  return mapProject(await getById(result.insertId));
 };
 
 const getById = async (projectId) => {
@@ -72,51 +94,54 @@ const getById = async (projectId) => {
   const { rows } = await query(
     `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token, view_start_hour, view_end_hour
      FROM projects
-     WHERE project_id = $1`,
+     WHERE project_id = ?`,
     [projectId],
   );
-  return rows[0];
+  return mapProject(rows[0]);
 };
 
-const update = async (projectId, { name, start_date, end_date, view_start_hour, view_end_hour }) => {
+const update = async (
+  projectId,
+  { name, start_date, end_date, view_start_hour, view_end_hour },
+) => {
   await ensureProjectColumns();
-  const { rows } = await query(
+  await query(
     `UPDATE projects
-     SET name = $1,
-         start_date = $2,
-         end_date = $3,
-         view_start_hour = COALESCE($4, view_start_hour),
-         view_end_hour = COALESCE($5, view_end_hour),
-         updated_at = NOW()
-     WHERE project_id = $6
-     RETURNING project_id, username, name, start_date, end_date, created_at, updated_at, public_ics_token, view_start_hour, view_end_hour`,
+     SET name = ?,
+         start_date = ?,
+         end_date = ?,
+         view_start_hour = COALESCE(?, view_start_hour),
+         view_end_hour = COALESCE(?, view_end_hour),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE project_id = ?`,
     [name, start_date, end_date, view_start_hour, view_end_hour, projectId],
   );
-  if (!rows.length) {
+  const project = await getById(projectId);
+  if (!project) {
     throw new ApiError(404, 'Projet introuvable');
   }
-  return rows[0];
+  return project;
 };
 
 const remove = async (projectId) => {
-  await query('DELETE FROM projects WHERE project_id = $1', [projectId]);
+  await query('DELETE FROM projects WHERE project_id = ?', [projectId]);
 };
 
 const regeneratePublicToken = async (projectId) => {
   await ensureProjectColumns();
   const token = randomBytes(24).toString('hex');
-  const { rows } = await query(
+  await query(
     `UPDATE projects
-     SET public_ics_token = $1,
-         updated_at = NOW()
-     WHERE project_id = $2
-     RETURNING project_id, username, name, start_date, end_date, created_at, updated_at, public_ics_token, view_start_hour, view_end_hour`,
+     SET public_ics_token = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE project_id = ?`,
     [token, projectId],
   );
-  if (!rows.length) {
+  const project = await getById(projectId);
+  if (!project) {
     throw new ApiError(404, 'Projet introuvable');
   }
-  return rows[0];
+  return project;
 };
 
 const toIcsDate = (value) => {
@@ -143,10 +168,10 @@ const getByPublicToken = async (token) => {
   const { rows } = await query(
     `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token, view_start_hour, view_end_hour
      FROM projects
-     WHERE public_ics_token = $1`,
+     WHERE public_ics_token = ?`,
     [token],
   );
-  return rows[0];
+  return mapProject(rows[0]);
 };
 
 const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
@@ -166,7 +191,7 @@ const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
      FROM events e
      JOIN modules m ON e.module_id = m.module_id
      JOIN calendars c ON m.calendar_id = c.calendar_id
-     WHERE c.project_id = $1
+     WHERE c.project_id = ?
      ORDER BY e.start_time ASC`,
     [projectId],
   );
@@ -199,7 +224,7 @@ const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
       location: event.location,
       start: event.start_time,
       end: event.end_time,
-      color: event.color,
+      color: event.color || '#4c6ef5',
     }));
 };
 
@@ -250,9 +275,9 @@ const getConfig = async (projectId) => {
     throw new ApiError(404, 'Projet introuvable');
   }
   const { rows } = await query(
-    `SELECT url, type, label
+    `SELECT url, type, label, color
      FROM calendars
-     WHERE project_id = $1
+     WHERE project_id = ?
      ORDER BY calendar_id ASC`,
     [projectId],
   );
@@ -266,7 +291,7 @@ const getConfig = async (projectId) => {
     },
     calendars: rows.map((calendar) => ({
       url: calendar.url,
-      type: calendar.type,
+      type: Boolean(calendar.type),
       label: calendar.label,
       color: calendar.color,
     })),
@@ -291,13 +316,13 @@ const importFromConfig = async (username, config) => {
         ? projectPayload.view_start_hour
         : projectPayload.view_start_hour
           ? Number(projectPayload.view_start_hour)
-          : 7,
+          : DEFAULT_START_HOUR,
     view_end_hour:
       typeof projectPayload.view_end_hour === 'number'
         ? projectPayload.view_end_hour
         : projectPayload.view_end_hour
           ? Number(projectPayload.view_end_hour)
-          : 19,
+          : DEFAULT_END_HOUR,
   });
 
   if (Array.isArray(config.calendars) && config.calendars.length) {

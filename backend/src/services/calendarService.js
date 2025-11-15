@@ -2,6 +2,8 @@ const ApiError = require('../utils/ApiError');
 const { query, withTransaction } = require('../config/db');
 const icsService = require('./icsService');
 
+const DEFAULT_COLOR = '#4c6ef5';
+
 let colorColumnPromise = null;
 
 const ensureColorColumn = async () => {
@@ -13,16 +15,31 @@ const ensureColorColumn = async () => {
       ALTER TABLE IF EXISTS calendars
       ADD COLUMN IF NOT EXISTS color TEXT
     `);
-    await query(`
+    await query(
+      `
       UPDATE calendars
-      SET color = '#4c6ef5'
+      SET color = ?
       WHERE color IS NULL
-    `);
+    `,
+      [DEFAULT_COLOR],
+    );
   })().catch((error) => {
     colorColumnPromise = null;
     throw error;
   });
   return colorColumnPromise;
+};
+
+const normalizeCalendar = (row) => {
+  if (!row) {
+    return null;
+  }
+  return {
+    ...row,
+    type: Boolean(row.type),
+    color: row.color || DEFAULT_COLOR,
+    module_count: row.module_count !== undefined ? Number(row.module_count || 0) : undefined,
+  };
 };
 
 const list = async (projectId) => {
@@ -40,15 +57,12 @@ const list = async (projectId) => {
         COUNT(m.module_id) AS module_count
      FROM calendars c
      LEFT JOIN modules m ON m.calendar_id = c.calendar_id
-     WHERE c.project_id = $1
+     WHERE c.project_id = ?
      GROUP BY c.calendar_id
      ORDER BY c.created_at DESC`,
     [projectId],
   );
-  return rows.map((row) => ({
-    ...row,
-    module_count: Number(row.module_count || 0),
-  }));
+  return rows.map(normalizeCalendar);
 };
 
 const getById = async (calendarId) => {
@@ -56,75 +70,63 @@ const getById = async (calendarId) => {
   const { rows } = await query(
     `SELECT calendar_id, project_id, url, type, label, color, last_synced, created_at
      FROM calendars
-     WHERE calendar_id = $1`,
+     WHERE calendar_id = ?`,
     [calendarId],
   );
-  return rows[0];
+  return normalizeCalendar(rows[0]);
 };
 
 const create = async (projectId, { url, type, label, color }) => {
   await ensureColorColumn();
-  const { rows } = await query(
+  const sanitizedColor = color || DEFAULT_COLOR;
+  const isInclusive = typeof type === 'boolean' ? (type ? 1 : 0) : 1;
+  const result = await query(
     `INSERT INTO calendars (project_id, url, type, label, color)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING calendar_id, project_id, url, type, label, color, created_at`,
-    [projectId, url, type, label, color || '#4c6ef5'],
+     VALUES (?, ?, ?, ?, ?)`,
+    [projectId, url, isInclusive, label || null, sanitizedColor],
   );
-  const calendar = rows[0];
+  const calendarId = result.insertId;
   try {
-    await sync(calendar.calendar_id);
+    await sync(calendarId);
   } catch (error) {
-    await query('DELETE FROM calendars WHERE calendar_id = $1', [calendar.calendar_id]);
+    await query('DELETE FROM calendars WHERE calendar_id = ?', [calendarId]);
     throw error;
   }
-  return getById(calendar.calendar_id);
+  return getById(calendarId);
 };
 
 const remove = async (calendarId) => {
-  await query('DELETE FROM calendars WHERE calendar_id = $1', [calendarId]);
+  await query('DELETE FROM calendars WHERE calendar_id = ?', [calendarId]);
 };
 
 const updateDetails = async (calendarId, { label, type, color } = {}) => {
   await ensureColorColumn();
   const fields = [];
   const values = [];
-  let index = 1;
 
   if (label !== undefined) {
-    fields.push(`label = $${index}`);
+    fields.push('label = ?');
     values.push(label);
-    index += 1;
   }
   if (typeof type === 'boolean') {
-    fields.push(`type = $${index}`);
-    values.push(type);
-    index += 1;
+    fields.push('type = ?');
+    values.push(type ? 1 : 0);
   }
   if (color !== undefined) {
-    fields.push(`color = $${index}`);
-    values.push(color || null);
-    index += 1;
+    fields.push('color = ?');
+    values.push(color || DEFAULT_COLOR);
   }
 
-  if (!fields.length) {
-    const calendar = await getById(calendarId);
-    if (!calendar) {
-      throw new ApiError(404, 'Calendrier introuvable');
-    }
-    return calendar;
+  if (fields.length) {
+    values.push(calendarId);
+    await query(`UPDATE calendars SET ${fields.join(', ')} WHERE calendar_id = ?`, values);
   }
 
-  const { rows } = await query(
-    `UPDATE calendars
-     SET ${fields.join(', ')}
-     WHERE calendar_id = $${index}
-     RETURNING calendar_id, project_id, url, type, label, color, last_synced, created_at`,
-    [...values, calendarId],
-  );
-  if (!rows.length) {
+  const calendar = await getById(calendarId);
+  if (!calendar) {
     throw new ApiError(404, 'Calendrier introuvable');
   }
-  return rows[0];
+  return calendar;
 };
 
 const sync = async (calendarId) => {
@@ -141,7 +143,7 @@ const sync = async (calendarId) => {
 
   await withTransaction(async (client) => {
     const { rows: existingModules } = await client.query(
-      'SELECT module_id, name FROM modules WHERE calendar_id = $1',
+      'SELECT module_id, name FROM modules WHERE calendar_id = ?',
       [calendarId],
     );
 
@@ -155,13 +157,12 @@ const sync = async (calendarId) => {
       if (existingByName.has(key)) {
         moduleIdsByName.set(key, existingByName.get(key).module_id);
       } else {
-        const { rows: inserted } = await client.query(
+        const insertResult = await client.query(
           `INSERT INTO modules (name, calendar_id, is_selected)
-           VALUES ($1, $2, $3)
-           RETURNING module_id, name`,
-          [moduleName, calendarId, calendar.type],
+           VALUES (?, ?, ?)`,
+          [moduleName, calendarId, calendar.type ? 1 : 0],
         );
-        moduleIdsByName.set(key, inserted[0].module_id);
+        moduleIdsByName.set(key, insertResult.insertId);
         modulesCreated += 1;
       }
     }
@@ -172,26 +173,25 @@ const sync = async (calendarId) => {
     );
     if (obsolete.length) {
       modulesRemoved = obsolete.length;
-      await client.query(
-        'DELETE FROM modules WHERE module_id = ANY($1::int[])',
-        [obsolete.map((module) => module.module_id)],
-      );
+      const placeholders = obsolete.map(() => '?').join(', ');
+      await client.query(`DELETE FROM modules WHERE module_id IN (${placeholders})`, [
+        ...obsolete.map((module) => module.module_id),
+      ]);
     }
 
-    await client.query('DELETE FROM events WHERE calendar_id = $1', [calendarId]);
+    await client.query('DELETE FROM events WHERE calendar_id = ?', [calendarId]);
 
     for (const event of events) {
       const key = event.moduleName.toLowerCase();
       const moduleId = moduleIdsByName.get(key);
       if (!moduleId) {
-        // Should not happen but skip silently if module mapping fails.
         // eslint-disable-next-line no-continue
         continue;
       }
       await client.query(
         `INSERT INTO events
            (calendar_id, module_id, external_id, title, description, location, start_time, end_time)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           calendarId,
           moduleId,
@@ -206,7 +206,7 @@ const sync = async (calendarId) => {
       eventsInserted += 1;
     }
 
-    await client.query('UPDATE calendars SET last_synced = NOW() WHERE calendar_id = $1', [
+    await client.query('UPDATE calendars SET last_synced = CURRENT_TIMESTAMP WHERE calendar_id = ?', [
       calendarId,
     ]);
   });

@@ -1,24 +1,53 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 
-const connectionOptions = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl:
-        process.env.DATABASE_SSL === 'true'
-          ? { rejectUnauthorized: false }
-          : undefined,
-    }
-  : {
-      host: process.env.PGHOST || 'localhost',
-      port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-      user: process.env.PGUSER || 'postgres',
-      password: process.env.PGPASSWORD || 'postgres',
-      database: process.env.PGDATABASE || 'calplanner',
+const buildConnectionOptions = () => {
+  if (process.env.DATABASE_URL) {
+    const url = new URL(process.env.DATABASE_URL);
+    return {
+      host: url.hostname,
+      port: url.port ? Number(url.port) : 3306,
+      user: url.username,
+      password: url.password,
+      database: url.pathname.replace('/', ''),
+      waitForConnections: true,
+      connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
+      queueLimit: 0,
+      ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      timezone: 'Z',
     };
+  }
 
-const pool = new Pool(connectionOptions);
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'calplanner',
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
+    queueLimit: 0,
+    timezone: 'Z',
+  };
+};
 
-const query = (text, params) => pool.query(text, params);
+const pool = mysql.createPool(buildConnectionOptions());
+
+const formatResult = (rows, fields) => {
+  if (Array.isArray(rows)) {
+    return { rows, fields };
+  }
+  return {
+    rows: [],
+    fields,
+    insertId: rows.insertId,
+    affectedRows: rows.affectedRows,
+  };
+};
+
+const query = async (text, params = []) => {
+  const [rows, fields] = await pool.query(text, params);
+  return formatResult(rows, fields);
+};
 
 const initDb = async () => {
   await pool.query('SELECT 1');
@@ -26,17 +55,23 @@ const initDb = async () => {
 };
 
 const withTransaction = async (callback) => {
-  const client = await pool.connect();
+  const connection = await pool.getConnection();
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
+    const client = {
+      query: async (text, params = []) => {
+        const [rows, fields] = await connection.query(text, params);
+        return formatResult(rows, fields);
+      },
+    };
     const result = await callback(client);
-    await client.query('COMMIT');
+    await connection.commit();
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     throw error;
   } finally {
-    client.release();
+    connection.release();
   }
 };
 

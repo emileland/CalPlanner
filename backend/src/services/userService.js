@@ -10,7 +10,7 @@ const sanitizeUser = (row) => ({
 
 const getByUsername = async (username) => {
   const { rows } = await query(
-    'SELECT username, email, created_at FROM users WHERE username = $1',
+    'SELECT username, email, created_at FROM users WHERE username = ?',
     [username],
   );
   if (!rows.length) {
@@ -21,66 +21,53 @@ const getByUsername = async (username) => {
 
 const getWithPassword = async (username) => {
   const { rows } = await query(
-    'SELECT username, email, password FROM users WHERE username = $1',
+    'SELECT username, email, password FROM users WHERE username = ?',
     [username],
   );
   return rows[0];
 };
 
 const findByEmail = async (email) => {
-  const { rows } = await query(
-    'SELECT username, email, password FROM users WHERE email = $1',
-    [email],
-  );
+  const { rows } = await query('SELECT username, email, password FROM users WHERE email = ?', [
+    email,
+  ]);
   return rows[0];
 };
 
 const create = async ({ username, email, password }) => {
   const hashed = await hashPassword(password);
-  const { rows } = await query(
-    `INSERT INTO users (username, email, password)
-     VALUES ($1, $2, $3)
-     RETURNING username, email, created_at`,
-    [username, email, hashed],
-  );
-  return sanitizeUser(rows[0]);
+  await query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [
+    username,
+    email,
+    hashed,
+  ]);
+  return getByUsername(username);
 };
 
 const update = async (username, { email, password }) => {
   const fields = [];
   const values = [];
-  let index = 1;
 
   if (email) {
-    fields.push(`email = $${index}`);
+    fields.push('email = ?');
     values.push(email);
-    index += 1;
   }
   if (password) {
     const hashed = await hashPassword(password);
-    fields.push(`password = $${index}`);
+    fields.push('password = ?');
     values.push(hashed);
-    index += 1;
   }
 
-  if (!fields.length) {
-    return getByUsername(username);
+  if (fields.length) {
+    values.push(username);
+    await query(`UPDATE users SET ${fields.join(', ')} WHERE username = ?`, values);
   }
 
-  values.push(username);
-
-  const { rows } = await query(
-    `UPDATE users SET ${fields.join(', ')}
-     WHERE username = $${index}
-     RETURNING username, email, created_at`,
-    values,
-  );
-
-  return sanitizeUser(rows[0]);
+  return getByUsername(username);
 };
 
 const remove = async (username) => {
-  await query('DELETE FROM users WHERE username = $1', [username]);
+  await query('DELETE FROM users WHERE username = ?', [username]);
 };
 
 module.exports = {

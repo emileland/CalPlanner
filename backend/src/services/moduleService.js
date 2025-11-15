@@ -1,50 +1,54 @@
 const ApiError = require('../utils/ApiError');
 const { query } = require('../config/db');
 
+const mapModule = (row) => ({
+  ...row,
+  is_selected: Boolean(row.is_selected),
+});
+
 const listByCalendar = async (calendarId) => {
   const { rows } = await query(
     `SELECT module_id, calendar_id, name, is_selected, created_at
      FROM modules
-     WHERE calendar_id = $1
+     WHERE calendar_id = ?
      ORDER BY name ASC`,
     [calendarId],
   );
-  return rows;
+  return rows.map(mapModule);
 };
 
 const getById = async (moduleId) => {
   const { rows } = await query(
     `SELECT module_id, calendar_id, name, is_selected
      FROM modules
-     WHERE module_id = $1`,
+     WHERE module_id = ?`,
     [moduleId],
   );
-  return rows[0];
+  return rows.length ? mapModule(rows[0]) : null;
 };
 
 const setSelection = async (moduleId, isSelected) => {
-  const { rows } = await query(
+  await query(
     `UPDATE modules
-     SET is_selected = $1
-     WHERE module_id = $2
-     RETURNING module_id, calendar_id, name, is_selected`,
-    [isSelected, moduleId],
+     SET is_selected = ?
+     WHERE module_id = ?`,
+    [isSelected ? 1 : 0, moduleId],
   );
-  if (!rows.length) {
+  const module = await getById(moduleId);
+  if (!module) {
     throw new ApiError(404, 'Module introuvable');
   }
-  return rows[0];
+  return module;
 };
 
 const setSelectionForCalendar = async (calendarId, isSelected) => {
-  const { rows } = await query(
+  await query(
     `UPDATE modules
-     SET is_selected = $1
-     WHERE calendar_id = $2
-     RETURNING module_id, calendar_id, name, is_selected, created_at`,
-    [isSelected, calendarId],
+     SET is_selected = ?
+     WHERE calendar_id = ?`,
+    [isSelected ? 1 : 0, calendarId],
   );
-  return rows.sort((a, b) => a.name.localeCompare(b.name));
+  return listByCalendar(calendarId);
 };
 
 module.exports = {
