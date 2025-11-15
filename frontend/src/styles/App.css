@@ -234,6 +234,18 @@ button {
   font-size: 2rem;
 }
 
+.project-header__titles {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.project-header__titles button {
+  align-self: center;
+}
+
 .panel {
   background: white;
   padding: 1.75rem;
@@ -372,6 +384,18 @@ button {
   flex: 1;
 }
 
+.form-field--inline {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-field--inline label {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+}
+
 .form-field input,
 .form-field select {
   border: 1px solid #cbd5f5;
@@ -379,11 +403,6 @@ button {
   padding: 0.75rem 1rem;
   font-size: 1rem;
   background: #f8fafc;
-}
-
-.form-field input[type='color'] {
-  padding: 0.15rem;
-  height: 48px;
 }
 
 .grid {
@@ -832,4 +851,9 @@ button {
   .app-shell__content {
     padding: 1.5rem;
   }
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
 }

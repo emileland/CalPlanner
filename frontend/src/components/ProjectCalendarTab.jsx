@@ -50,7 +50,34 @@ const formatDateTime = (value) => {
   }).format(date);
 };
 
-const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 19;
+
+const clampHour = (hour, fallback) => {
+  if (typeof hour !== 'number' || Number.isNaN(hour)) {
+    return fallback;
+  }
+  return Math.min(23, Math.max(0, Math.floor(hour)));
+};
+
+const getHourBounds = (start, end) => {
+  const minHour = clampHour(start, DEFAULT_START_HOUR);
+  let maxHour = clampHour(end, DEFAULT_END_HOUR);
+  if (maxHour <= minHour) {
+    maxHour = Math.min(23, minHour + 1);
+  }
+  return { minHour, maxHour };
+};
+
+const toFullCalendarTime = (hour) => `${String(hour).padStart(2, '0')}:00:00`;
+
+const ProjectCalendarTab = ({
+  projectId,
+  hasCalendars,
+  startHour = DEFAULT_START_HOUR,
+  endHour = DEFAULT_END_HOUR,
+}) => {
+  const { minHour, maxHour } = getHourBounds(startHour, endHour);
   const [events, setEvents] = useState([]);
   const [loadingRange, setLoadingRange] = useState(false);
   const [error, setError] = useState(null);
@@ -139,6 +166,8 @@ const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
+          slotMinTime={toFullCalendarTime(minHour)}
+          slotMaxTime={toFullCalendarTime(maxHour)}
           eventContent={renderEventContent}
           events={events}
           eventClick={(info) => {

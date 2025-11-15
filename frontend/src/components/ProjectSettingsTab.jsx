@@ -5,6 +5,9 @@ import { useProjectStore } from '../store/projectStore.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 19;
+
 const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
   const updateProjectInStore = useProjectStore((state) => state.updateProject);
   const removeProjectFromStore = useProjectStore((state) => state.removeProject);
@@ -14,6 +17,8 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
     name: '',
     start_date: '',
     end_date: '',
+    view_start_hour: DEFAULT_START_HOUR,
+    view_end_hour: DEFAULT_END_HOUR,
   });
   const [feedback, setFeedback] = useState(null);
   const [error, setError] = useState(null);
@@ -34,6 +39,12 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
         name: project.name || '',
         start_date: project.start_date || '',
         end_date: project.end_date || '',
+        view_start_hour:
+          typeof project.view_start_hour === 'number'
+            ? project.view_start_hour
+            : DEFAULT_START_HOUR,
+        view_end_hour:
+          typeof project.view_end_hour === 'number' ? project.view_end_hour : DEFAULT_END_HOUR,
       });
       setIcsFeedback(null);
       setIcsError(null);
@@ -48,7 +59,23 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+    if (name === 'view_start_hour' || name === 'view_end_hour') {
+      const numericValue = value === '' ? '' : Number(value);
+      setForm((prev) => ({ ...prev, [name]: numericValue }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const parseHour = (value, fallback) => {
+    if (value === '' || value === null || value === undefined) {
+      return fallback;
+    }
+    const number = Number(value);
+    if (Number.isNaN(number)) {
+      return fallback;
+    }
+    return Math.min(23, Math.max(0, number));
   };
 
   const getIcsFilename = () => {
@@ -70,6 +97,8 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
         ...form,
         start_date: form.start_date || null,
         end_date: form.end_date || null,
+        view_start_hour: parseHour(form.view_start_hour, DEFAULT_START_HOUR),
+        view_end_hour: parseHour(form.view_end_hour, DEFAULT_END_HOUR),
       });
       updateProjectInStore(updated);
       onProjectUpdated?.(updated);
@@ -185,24 +214,51 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
 
   return (
     <div className="project-settings">
-      <form className="form grid grid-2" onSubmit={handleSubmit}>
+      <form className="form" onSubmit={handleSubmit}>
         {error ? <p className="alert alert-error">{error}</p> : null}
         {feedback ? <p className="alert alert-success">{feedback}</p> : null}
 
-        <label className="form-field">
-          <span>Nom du projet</span>
-          <input type="text" name="name" value={form.name} onChange={handleChange} required />
-        </label>
+        <div className="form-row">
+          <label className="form-field">
+            <span>Nom du projet</span>
+            <input type="text" name="name" value={form.name} onChange={handleChange} required />
+          </label>
 
-        <label className="form-field">
-          <span>Date de début</span>
-          <input type="date" name="start_date" value={form.start_date || ''} onChange={handleChange} />
-        </label>
+          <label className="form-field">
+            <span>Date de début</span>
+            <input type="date" name="start_date" value={form.start_date || ''} onChange={handleChange} />
+          </label>
 
-        <label className="form-field">
-          <span>Date de fin</span>
-          <input type="date" name="end_date" value={form.end_date || ''} onChange={handleChange} />
-        </label>
+          <label className="form-field">
+            <span>Date de fin</span>
+            <input type="date" name="end_date" value={form.end_date || ''} onChange={handleChange} />
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label className="form-field">
+            <span>Heure de début affichée (0-23)</span>
+            <input
+              type="number"
+              name="view_start_hour"
+              min="0"
+              max="23"
+              value={form.view_start_hour}
+              onChange={handleChange}
+            />
+          </label>
+          <label className="form-field">
+            <span>Heure de fin affichée (0-23)</span>
+            <input
+              type="number"
+              name="view_end_hour"
+              min="0"
+              max="23"
+              value={form.view_end_hour}
+              onChange={handleChange}
+            />
+          </label>
+        </div>
 
         <div className="form-field align-end">
           <button type="submit" className="btn btn-primary" disabled={saving}>

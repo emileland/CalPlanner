@@ -110,7 +110,7 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
       setEditingCalendarId(null);
       setLabelDraft('');
       setTypeDraft('true');
-      setColorDraft('#4c6ef5');
+      setColorDraft(DEFAULT_COLOR);
     } catch (error) {
       setCalendarEditError(error.message);
     } finally {
@@ -159,27 +159,6 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
       setModulesError(error.message);
     } finally {
       setModulesLoadingId(null);
-    }
-  };
-
-  const resync = async (calendarId) => {
-    setBusyCalendar(calendarId);
-    setFeedback(null);
-    setFormError(null);
-    try {
-      const summary = await calendarApi.sync(projectId, calendarId);
-      setFeedback(
-        `Synchronisation terminée : ${summary.modulesCreated} modules ajoutés · ${summary.modulesRemoved} retirés · ${summary.eventsCreated} événements.`,
-      );
-      await onRefresh();
-      if (modulesCache[calendarId]) {
-        const modules = await moduleApi.list(projectId, calendarId);
-        setModulesCache((prev) => ({ ...prev, [calendarId]: modules }));
-      }
-    } catch (error) {
-      setFormError(error.message);
-    } finally {
-      setBusyCalendar(null);
     }
   };
 
@@ -469,14 +448,6 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
                       </p>
                     </div>
                     <div className="calendar-actions">
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => resync(calendar.calendar_id)}
-                        disabled={isBusy}
-                      >
-                        Synchroniser
-                      </button>
                       <button
                         type="button"
                         className="btn btn-ghost"

@@ -17,6 +17,16 @@ const projectValidators = [
     .optional()
     .isISO8601()
     .withMessage('end_date doit être au format ISO8601'),
+  body('view_start_hour')
+    .optional()
+    .isInt({ min: 0, max: 23 })
+    .withMessage('view_start_hour doit être entre 0 et 23')
+    .toInt(),
+  body('view_end_hour')
+    .optional()
+    .isInt({ min: 0, max: 23 })
+    .withMessage('view_end_hour doit être entre 0 et 23')
+    .toInt(),
 ];
 
 router

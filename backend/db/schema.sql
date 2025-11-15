@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS projects (
     start_date DATE,
     end_date DATE,
     public_ics_token TEXT UNIQUE,
+    view_start_hour INTEGER,
+    view_end_hour INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT chk_project_dates CHECK (

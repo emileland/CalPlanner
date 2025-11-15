@@ -19,6 +19,7 @@ const ProjectPage = () => {
   const [activeTab, setActiveTab] = useState('settings');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const selectProject = useProjectStore((state) => state.selectProject);
   const updateProjectStore = useProjectStore((state) => state.updateProject);
@@ -55,6 +56,24 @@ const ProjectPage = () => {
     return list;
   };
 
+  const syncAllCalendars = async () => {
+    if (!calendars.length) {
+      return;
+    }
+    setSyncingAll(true);
+    setError(null);
+    try {
+      for (const calendar of calendars) {
+        await calendarApi.sync(projectId, calendar.calendar_id);
+      }
+      await refreshCalendars();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   const projectDates = useMemo(() => {
     if (!project) return '';
     if (!project.start_date && !project.end_date) {
@@ -67,11 +86,21 @@ const ProjectPage = () => {
 
   return (
     <div className="page page-project">
-      <header className="page-header">
-        <div>
-          <p className="hero-kicker">Projet #{projectId}</p>
-          <h1>{project?.name || 'Chargement...'}</h1>
-          <p>{projectDates}</p>
+      <header className="page-header project-header">
+        <div className="project-header__titles">
+          <div>
+            <p className="hero-kicker">Projet #{projectId}</p>
+            <h1>{project?.name || 'Chargement...'}</h1>
+            <p>{projectDates}</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={syncAllCalendars}
+            disabled={syncingAll || !calendars.length}
+          >
+            {syncingAll ? 'Synchronisation...' : 'Synchroniser les calendriers'}
+          </button>
         </div>
       </header>
 
@@ -97,7 +126,12 @@ const ProjectPage = () => {
             <ProjectSettingsTab project={project} onProjectUpdated={setProject} />
           ) : null}
           {activeTab === 'planner' ? (
-            <ProjectCalendarTab projectId={projectId} hasCalendars={calendars.length > 0} />
+            <ProjectCalendarTab
+              projectId={projectId}
+              hasCalendars={calendars.length > 0}
+              startHour={project?.view_start_hour}
+              endHour={project?.view_end_hour}
+            />
           ) : null}
           {activeTab === 'calendars' ? (
             <ProjectCalendarsTab projectId={projectId} calendars={calendars} onRefresh={refreshCalendars} />

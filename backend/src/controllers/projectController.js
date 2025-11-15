@@ -12,6 +12,8 @@ const create = asyncHandler(async (req, res) => {
     name: req.body.name,
     start_date: req.body.start_date,
     end_date: req.body.end_date,
+    view_start_hour: req.body.view_start_hour ?? 7,
+    view_end_hour: req.body.view_end_hour ?? 19,
   });
   res.status(201).json(project);
 });
@@ -25,6 +27,8 @@ const update = asyncHandler(async (req, res) => {
     name: req.body.name,
     start_date: req.body.start_date,
     end_date: req.body.end_date,
+    view_start_hour: req.body.view_start_hour,
+    view_end_hour: req.body.view_end_hour,
   });
   res.json(project);
 });
