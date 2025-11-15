@@ -19,6 +19,9 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
   const [downloadingIcs, setDownloadingIcs] = useState(false);
   const [copyingLink, setCopyingLink] = useState(false);
   const [regeneratingLink, setRegeneratingLink] = useState(false);
+  const [configFeedback, setConfigFeedback] = useState(null);
+  const [configError, setConfigError] = useState(null);
+  const [exportingConfig, setExportingConfig] = useState(false);
 
   useEffect(() => {
     if (project) {
@@ -29,6 +32,8 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
       });
       setIcsFeedback(null);
       setIcsError(null);
+      setConfigFeedback(null);
+      setConfigError(null);
     }
   }, [project]);
 
@@ -131,6 +136,30 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
     }
   };
 
+  const handleExportConfig = async () => {
+    setExportingConfig(true);
+    setConfigError(null);
+    setConfigFeedback(null);
+    try {
+      const config = await projectApi.exportConfig(project.project_id);
+      const filename = `${getIcsFilename().replace(/\.ics$/i, '') || 'calplanner'}-config.json`;
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setConfigFeedback('Configuration exportée.');
+    } catch (err) {
+      setConfigError(err.message);
+    } finally {
+      setExportingConfig(false);
+    }
+  };
+
   return (
     <div className="project-settings">
       <form className="form grid grid-2" onSubmit={handleSubmit}>
@@ -190,6 +219,19 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
           disabled={regeneratingLink}
         >
           {regeneratingLink ? 'Regénération...' : 'Regénérer le lien sécurisé'}
+        </button>
+      </section>
+
+      <section className="panel">
+        <h3>Configuration du projet</h3>
+        <p className="text-muted">
+          Exportez cette configuration pour la partager ou la réimporter ailleurs. Le fichier inclut le projet et tous
+          les calendriers rattachés.
+        </p>
+        {configError ? <p className="alert alert-error">{configError}</p> : null}
+        {configFeedback ? <p className="alert alert-success">{configFeedback}</p> : null}
+        <button type="button" className="btn btn-secondary" onClick={handleExportConfig} disabled={exportingConfig}>
+          {exportingConfig ? 'Export en cours...' : 'Exporter la configuration (.json)'}
         </button>
       </section>
     </div>

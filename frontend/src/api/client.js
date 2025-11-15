@@ -84,6 +84,12 @@ export const projectApi = {
     }
     return response.blob();
   },
+  exportConfig: (projectId) => request(`/projects/${projectId}/config`),
+  importConfig: (payload) =>
+    request('/projects/import-config', {
+      method: 'POST',
+      body: payload,
+    }),
   listEvents: (projectId, { viewStart, viewEnd } = {}) => {
     const params = new URLSearchParams();
     if (viewStart) {

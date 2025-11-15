@@ -20,6 +20,8 @@ const ProjectsPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [importError, setImportError] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const navigate = useNavigate();
 
@@ -69,6 +71,32 @@ const ProjectsPage = () => {
     navigate(`/app/projects/${project.project_id}`);
   };
 
+  const handleImportConfig = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setImportError(null);
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const created = await projectApi.importConfig(payload);
+      prependProject(created);
+      selectProject(created);
+      navigate(`/app/projects/${created.project_id}`);
+    } catch (err) {
+      const message =
+        err instanceof SyntaxError
+          ? 'Fichier invalide : impossible de lire la configuration.'
+          : err.message;
+      setImportError(message);
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
+  };
+
   return (
     <div className="page page-projects">
       <header className="page-header">
@@ -108,6 +136,20 @@ const ProjectsPage = () => {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="panel">
+        <h2>Importer un projet existant</h2>
+        <p className="text-muted">
+          Importez un fichier de configuration (exporté depuis un autre projet) pour recréer automatiquement le projet
+          et ses calendriers.
+        </p>
+        {importError ? <p className="alert alert-error">{importError}</p> : null}
+        <label className="form-field">
+          <span>Fichier de configuration (.json)</span>
+          <input type="file" accept="application/json" onChange={handleImportConfig} disabled={importing} />
+        </label>
+        {importing ? <span className="badge">Import en cours...</span> : null}
       </section>
 
       <section className="panel">

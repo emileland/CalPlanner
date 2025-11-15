@@ -53,6 +53,16 @@ const exportIcs = asyncHandler(async (req, res) => {
   res.send(icsPayload);
 });
 
+const exportConfig = asyncHandler(async (req, res) => {
+  const config = await projectService.getConfig(req.project.project_id);
+  res.json(config);
+});
+
+const importConfig = asyncHandler(async (req, res) => {
+  const project = await projectService.importFromConfig(req.user.username, req.body);
+  res.status(201).json(project);
+});
+
 const regenerateIcsToken = asyncHandler(async (req, res) => {
   const project = await projectService.regeneratePublicToken(req.project.project_id);
   res.json(project);
@@ -66,5 +76,7 @@ module.exports = {
   remove,
   listEvents,
   exportIcs,
+  exportConfig,
+  importConfig,
   regenerateIcsToken,
 };

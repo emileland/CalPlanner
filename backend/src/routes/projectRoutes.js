@@ -23,6 +23,7 @@ router
   .route('/')
   .get(projectController.list)
   .post(projectValidators, validate, projectController.create);
+router.post('/import-config', projectController.importConfig);
 
 router
   .route('/:projectId')
@@ -33,6 +34,7 @@ router
 
 router.get('/:projectId/events', withProject, projectController.listEvents);
 router.get('/:projectId/ics', withProject, projectController.exportIcs);
+router.get('/:projectId/config', withProject, projectController.exportConfig);
 router.post('/:projectId/ics/token', withProject, projectController.regenerateIcsToken);
 
 router.use('/:projectId/calendars', withProject, calendarRoutes);

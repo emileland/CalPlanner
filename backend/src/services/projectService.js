@@ -1,6 +1,7 @@
 const ApiError = require('../utils/ApiError');
 const { randomBytes } = require('crypto');
 const { query } = require('../config/db');
+const calendarService = require('./calendarService');
 
 let publicTokenColumnPromise = null;
 
@@ -220,6 +221,75 @@ const generateIcs = async (projectId) => {
   return lines.join('\r\n');
 };
 
+const getConfig = async (projectId) => {
+  await ensurePublicTokenColumn();
+  const project = await getById(projectId);
+  if (!project) {
+    throw new ApiError(404, 'Projet introuvable');
+  }
+  const { rows } = await query(
+    `SELECT url, type, label
+     FROM calendars
+     WHERE project_id = $1
+     ORDER BY calendar_id ASC`,
+    [projectId],
+  );
+  return {
+    project: {
+      name: project.name,
+      start_date: project.start_date,
+      end_date: project.end_date,
+    },
+    calendars: rows.map((calendar) => ({
+      url: calendar.url,
+      type: calendar.type,
+      label: calendar.label,
+    })),
+  };
+};
+
+const importFromConfig = async (username, config) => {
+  if (!config || typeof config !== 'object') {
+    throw new ApiError(400, 'Configuration invalide');
+  }
+  const projectPayload = config.project || {};
+  if (!projectPayload.name) {
+    throw new ApiError(400, 'Le nom du projet est requis dans la configuration');
+  }
+  const createdProject = await create({
+    username,
+    name: projectPayload.name,
+    start_date: projectPayload.start_date || null,
+    end_date: projectPayload.end_date || null,
+  });
+
+  if (Array.isArray(config.calendars) && config.calendars.length) {
+    try {
+      for (const calendar of config.calendars) {
+        if (!calendar?.url) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        await calendarService.create(createdProject.project_id, {
+          url: calendar.url,
+          type:
+            typeof calendar.type === 'boolean'
+              ? calendar.type
+              : calendar.type === 'false'
+                ? false
+                : true,
+          label: calendar.label,
+        });
+      }
+    } catch (error) {
+      await remove(createdProject.project_id);
+      throw error;
+    }
+  }
+
+  return getById(createdProject.project_id);
+};
+
 module.exports = {
   listByUser,
   create,
@@ -230,4 +300,6 @@ module.exports = {
   regeneratePublicToken,
   listEvents,
   generateIcs,
+  getConfig,
+  importFromConfig,
 };
