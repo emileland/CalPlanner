@@ -32,6 +32,8 @@ router
   .delete(projectController.remove);
 
 router.get('/:projectId/events', withProject, projectController.listEvents);
+router.get('/:projectId/ics', withProject, projectController.exportIcs);
+router.post('/:projectId/ics/token', withProject, projectController.regenerateIcsToken);
 
 router.use('/:projectId/calendars', withProject, calendarRoutes);
 

@@ -1,9 +1,34 @@
 const ApiError = require('../utils/ApiError');
+const { randomBytes } = require('crypto');
 const { query } = require('../config/db');
 
+let publicTokenColumnPromise = null;
+
+const ensurePublicTokenColumn = async () => {
+  if (publicTokenColumnPromise) {
+    return publicTokenColumnPromise;
+  }
+  publicTokenColumnPromise = (async () => {
+    await query(`
+      ALTER TABLE IF EXISTS projects
+      ADD COLUMN IF NOT EXISTS public_ics_token TEXT UNIQUE
+    `);
+    await query(`
+      UPDATE projects
+      SET public_ics_token = md5(random()::text || clock_timestamp()::text)
+      WHERE public_ics_token IS NULL
+    `);
+  })().catch((error) => {
+    publicTokenColumnPromise = null;
+    throw error;
+  });
+  return publicTokenColumnPromise;
+};
+
 const listByUser = async (username) => {
+  await ensurePublicTokenColumn();
   const { rows } = await query(
-    `SELECT project_id, username, name, start_date, end_date, created_at
+    `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token
      FROM projects
      WHERE username = $1
      ORDER BY created_at DESC`,
@@ -13,18 +38,20 @@ const listByUser = async (username) => {
 };
 
 const create = async ({ username, name, start_date, end_date }) => {
+  await ensurePublicTokenColumn();
   const { rows } = await query(
-    `INSERT INTO projects (username, name, start_date, end_date)
-     VALUES ($1, $2, $3, $4)
-     RETURNING project_id, username, name, start_date, end_date, created_at`,
-    [username, name, start_date, end_date],
+    `INSERT INTO projects (username, name, start_date, end_date, public_ics_token)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING project_id, username, name, start_date, end_date, created_at, public_ics_token`,
+    [username, name, start_date, end_date, randomBytes(24).toString('hex')],
   );
   return rows[0];
 };
 
 const getById = async (projectId) => {
+  await ensurePublicTokenColumn();
   const { rows } = await query(
-    `SELECT project_id, username, name, start_date, end_date, created_at
+    `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token
      FROM projects
      WHERE project_id = $1`,
     [projectId],
@@ -33,6 +60,7 @@ const getById = async (projectId) => {
 };
 
 const update = async (projectId, { name, start_date, end_date }) => {
+  await ensurePublicTokenColumn();
   const { rows } = await query(
     `UPDATE projects
      SET name = $1,
@@ -40,7 +68,7 @@ const update = async (projectId, { name, start_date, end_date }) => {
          end_date = $3,
          updated_at = NOW()
      WHERE project_id = $4
-     RETURNING project_id, username, name, start_date, end_date, created_at, updated_at`,
+     RETURNING project_id, username, name, start_date, end_date, created_at, updated_at, public_ics_token`,
     [name, start_date, end_date, projectId],
   );
   if (!rows.length) {
@@ -53,7 +81,54 @@ const remove = async (projectId) => {
   await query('DELETE FROM projects WHERE project_id = $1', [projectId]);
 };
 
-const listEvents = async (projectId, { viewStart, viewEnd }) => {
+const regeneratePublicToken = async (projectId) => {
+  await ensurePublicTokenColumn();
+  const token = randomBytes(24).toString('hex');
+  const { rows } = await query(
+    `UPDATE projects
+     SET public_ics_token = $1,
+         updated_at = NOW()
+     WHERE project_id = $2
+     RETURNING project_id, username, name, start_date, end_date, created_at, updated_at, public_ics_token`,
+    [token, projectId],
+  );
+  if (!rows.length) {
+    throw new ApiError(404, 'Projet introuvable');
+  }
+  return rows[0];
+};
+
+const toIcsDate = (value) => {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+};
+
+const escapeIcsText = (value = '') =>
+  value
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
+    .trim();
+
+const getByPublicToken = async (token) => {
+  await ensurePublicTokenColumn();
+  const { rows } = await query(
+    `SELECT project_id, username, name, start_date, end_date, created_at, public_ics_token
+     FROM projects
+     WHERE public_ics_token = $1`,
+    [token],
+  );
+  return rows[0];
+};
+
+const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
   const { rows } = await query(
     `SELECT
         e.event_id,
@@ -105,11 +180,54 @@ const listEvents = async (projectId, { viewStart, viewEnd }) => {
     }));
 };
 
+const generateIcs = async (projectId) => {
+  const events = await listEvents(projectId);
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CalPlanner//FR',
+    'CALSCALE:GREGORIAN',
+  ];
+  const stamp = toIcsDate(new Date());
+
+  events.forEach((event) => {
+    const start = toIcsDate(event.start);
+    const end = toIcsDate(event.end);
+    if (!start || !end) {
+      return;
+    }
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:${event.eventId || `${projectId}-${start}`}`);
+    if (stamp) {
+      lines.push(`DTSTAMP:${stamp}`);
+    }
+    lines.push(`DTSTART:${start}`);
+    lines.push(`DTEND:${end}`);
+    lines.push(`SUMMARY:${escapeIcsText(event.title || event.moduleName || 'Événement')}`);
+    if (event.moduleName) {
+      lines.push(`CATEGORIES:${escapeIcsText(event.moduleName)}`);
+    }
+    if (event.location) {
+      lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+    }
+    if (event.description) {
+      lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+    }
+    lines.push('END:VEVENT');
+  });
+
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+};
+
 module.exports = {
   listByUser,
   create,
   getById,
+  getByPublicToken,
   update,
   remove,
+  regeneratePublicToken,
   listEvents,
+  generateIcs,
 };

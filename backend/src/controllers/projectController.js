@@ -43,6 +43,21 @@ const listEvents = asyncHandler(async (req, res) => {
   res.json(events);
 });
 
+const exportIcs = asyncHandler(async (req, res) => {
+  const icsPayload = await projectService.generateIcs(req.project.project_id);
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="calplanner-project-${req.project.project_id}.ics"`,
+  );
+  res.send(icsPayload);
+});
+
+const regenerateIcsToken = asyncHandler(async (req, res) => {
+  const project = await projectService.regeneratePublicToken(req.project.project_id);
+  res.json(project);
+});
+
 module.exports = {
   list,
   create,
@@ -50,4 +65,6 @@ module.exports = {
   update,
   remove,
   listEvents,
+  exportIcs,
+  regenerateIcsToken,
 };

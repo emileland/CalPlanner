@@ -69,6 +69,21 @@ export const projectApi = {
       method: 'PUT',
       body: payload,
     }),
+  regenerateIcsToken: (projectId) =>
+    request(`/projects/${projectId}/ics/token`, {
+      method: 'POST',
+    }),
+  exportIcs: async (projectId) => {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/ics`, {
+      headers: buildHeaders(false),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.error || 'Impossible de générer le fichier ICS';
+      throw new Error(message);
+    }
+    return response.blob();
+  },
   listEvents: (projectId, { viewStart, viewEnd } = {}) => {
     const params = new URLSearchParams();
     if (viewStart) {
