@@ -355,6 +355,12 @@ button {
   gap: 1.5rem;
 }
 
+.project-settings .form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .ics-link {
   display: flex;
   flex-direction: column;

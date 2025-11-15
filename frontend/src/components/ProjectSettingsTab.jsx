@@ -234,6 +234,14 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
             <input type="date" name="end_date" value={form.end_date || ''} onChange={handleChange} />
           </label>
         </div>
+        
+
+        <div className="form-field">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </form>
 
         <div className="form-row">
           <label className="form-field">
@@ -259,13 +267,6 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
             />
           </label>
         </div>
-
-        <div className="form-field align-end">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
-        </div>
-      </form>
 
       <section className="panel">
         <h3>Exporter vers Google Calendar / ICS</h3>
