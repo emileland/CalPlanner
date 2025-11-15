@@ -69,6 +69,10 @@ export const projectApi = {
       method: 'PUT',
       body: payload,
     }),
+  remove: (projectId) =>
+    request(`/projects/${projectId}`, {
+      method: 'DELETE',
+    }),
   regenerateIcsToken: (projectId) =>
     request(`/projects/${projectId}/ics/token`, {
       method: 'POST',

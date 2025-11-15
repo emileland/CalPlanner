@@ -9,10 +9,25 @@ import '@fullcalendar/common/main.css';
 
 const cleanDetail = (value) => value?.trim() || '';
 
+const getReadableTextColor = (hex) => {
+  if (!hex) {
+    return '#0f172a';
+  }
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) {
+    return '#0f172a';
+  }
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.65 ? '#0f172a' : '#fff';
+};
+
 const renderEventContent = (eventInfo) => {
-  const { moduleName } = eventInfo.event.extendedProps;
+  const { moduleName, color } = eventInfo.event.extendedProps;
   return (
-    <div className="event-chip event-chip--compact">
+    <div className="event-chip event-chip--compact" style={{ color: getReadableTextColor(color) }}>
       <span className="event-chip__module">{moduleName || eventInfo.event.title}</span>
     </div>
   );
@@ -62,17 +77,23 @@ const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
           viewEnd: end.toISOString(),
         });
         setEvents(
-          data.map((event) => ({
-            id: event.eventId,
-            title: event.title || event.moduleName,
-            start: event.start,
-            end: event.end,
-            extendedProps: {
-              description: cleanDetail(event.description),
-              location: cleanDetail(event.location),
-              moduleName: event.moduleName,
-            },
-          })),
+          data.map((event) => {
+            const eventColor = event.color || '#4c6ef5';
+            return {
+              id: event.eventId,
+              title: event.title || event.moduleName,
+              start: event.start,
+              end: event.end,
+              backgroundColor: eventColor,
+              borderColor: eventColor,
+              extendedProps: {
+                description: cleanDetail(event.description),
+                location: cleanDetail(event.location),
+                moduleName: event.moduleName,
+                color: eventColor,
+              },
+            };
+          }),
         );
       } catch (err) {
         setError(err.message);
@@ -130,6 +151,7 @@ const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
               description: extendedProps.description,
               start: info.event.start,
               end: info.event.end,
+              color: extendedProps.color,
             });
           }}
           datesSet={(arg) => {
@@ -137,6 +159,12 @@ const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
             loadEvents({ start: arg.start, end: arg.end });
           }}
         />
+        eventDidMount={(info) => {
+          const color = info.event.extendedProps.color || '#4c6ef5';
+          info.el.style.backgroundColor = color;
+          info.el.style.borderColor = color;
+          info.el.style.color = getReadableTextColor(color);
+        }}
         {loadingRange ? <div className="calendar-overlay">Mise à jour du planning…</div> : null}
       </div>
       {selectedEvent ? (
@@ -154,7 +182,12 @@ const ProjectCalendarTab = ({ projectId, hasCalendars }) => {
           >
             <header className="modal-card__header">
               <div>
-                <p className="modal-card__kicker">{selectedEvent.moduleName}</p>
+                <p
+                  className="modal-card__kicker"
+                  style={{ color: selectedEvent.color || '#6366f1' }}
+                >
+                  {selectedEvent.moduleName}
+                </p>
                 <h4>{selectedEvent.title}</h4>
               </div>
               <button type="button" className="btn btn-link modal-close" onClick={() => setSelectedEvent(null)}>

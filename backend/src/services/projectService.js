@@ -141,7 +141,8 @@ const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
         e.module_id,
         m.name AS module_name,
         m.is_selected,
-        c.calendar_id
+        c.calendar_id,
+        c.color
      FROM events e
      JOIN modules m ON e.module_id = m.module_id
      JOIN calendars c ON m.calendar_id = c.calendar_id
@@ -178,6 +179,7 @@ const listEvents = async (projectId, { viewStart, viewEnd } = {}) => {
       location: event.location,
       start: event.start_time,
       end: event.end_time,
+      color: event.color,
     }));
 };
 
@@ -244,6 +246,7 @@ const getConfig = async (projectId) => {
       url: calendar.url,
       type: calendar.type,
       label: calendar.label,
+      color: calendar.color,
     })),
   };
 };
@@ -279,6 +282,7 @@ const importFromConfig = async (username, config) => {
                 ? false
                 : true,
           label: calendar.label,
+          color: calendar.color,
         });
       }
     } catch (error) {

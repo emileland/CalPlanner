@@ -2,7 +2,31 @@ const ApiError = require('../utils/ApiError');
 const { query, withTransaction } = require('../config/db');
 const icsService = require('./icsService');
 
+let colorColumnPromise = null;
+
+const ensureColorColumn = async () => {
+  if (colorColumnPromise) {
+    return colorColumnPromise;
+  }
+  colorColumnPromise = (async () => {
+    await query(`
+      ALTER TABLE IF EXISTS calendars
+      ADD COLUMN IF NOT EXISTS color TEXT
+    `);
+    await query(`
+      UPDATE calendars
+      SET color = '#4c6ef5'
+      WHERE color IS NULL
+    `);
+  })().catch((error) => {
+    colorColumnPromise = null;
+    throw error;
+  });
+  return colorColumnPromise;
+};
+
 const list = async (projectId) => {
+  await ensureColorColumn();
   const { rows } = await query(
     `SELECT
         c.calendar_id,
@@ -10,6 +34,7 @@ const list = async (projectId) => {
         c.url,
         c.type,
         c.label,
+        c.color,
         c.last_synced,
         c.created_at,
         COUNT(m.module_id) AS module_count
@@ -27,8 +52,9 @@ const list = async (projectId) => {
 };
 
 const getById = async (calendarId) => {
+  await ensureColorColumn();
   const { rows } = await query(
-    `SELECT calendar_id, project_id, url, type, label, last_synced, created_at
+    `SELECT calendar_id, project_id, url, type, label, color, last_synced, created_at
      FROM calendars
      WHERE calendar_id = $1`,
     [calendarId],
@@ -36,12 +62,13 @@ const getById = async (calendarId) => {
   return rows[0];
 };
 
-const create = async (projectId, { url, type, label }) => {
+const create = async (projectId, { url, type, label, color }) => {
+  await ensureColorColumn();
   const { rows } = await query(
-    `INSERT INTO calendars (project_id, url, type, label)
-     VALUES ($1, $2, $3, $4)
-     RETURNING calendar_id, project_id, url, type, label, created_at`,
-    [projectId, url, type, label],
+    `INSERT INTO calendars (project_id, url, type, label, color)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING calendar_id, project_id, url, type, label, color, created_at`,
+    [projectId, url, type, label, color || '#4c6ef5'],
   );
   const calendar = rows[0];
   try {
@@ -57,7 +84,8 @@ const remove = async (calendarId) => {
   await query('DELETE FROM calendars WHERE calendar_id = $1', [calendarId]);
 };
 
-const updateDetails = async (calendarId, { label, type } = {}) => {
+const updateDetails = async (calendarId, { label, type, color } = {}) => {
+  await ensureColorColumn();
   const fields = [];
   const values = [];
   let index = 1;
@@ -70,6 +98,11 @@ const updateDetails = async (calendarId, { label, type } = {}) => {
   if (typeof type === 'boolean') {
     fields.push(`type = $${index}`);
     values.push(type);
+    index += 1;
+  }
+  if (color !== undefined) {
+    fields.push(`color = $${index}`);
+    values.push(color || null);
     index += 1;
   }
 
@@ -85,7 +118,7 @@ const updateDetails = async (calendarId, { label, type } = {}) => {
     `UPDATE calendars
      SET ${fields.join(', ')}
      WHERE calendar_id = $${index}
-     RETURNING calendar_id, project_id, url, type, label, last_synced, created_at`,
+     RETURNING calendar_id, project_id, url, type, label, color, last_synced, created_at`,
     [...values, calendarId],
   );
   if (!rows.length) {

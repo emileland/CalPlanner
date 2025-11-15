@@ -1,10 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { calendarApi, moduleApi } from '../api/client.js';
+
+const COLOR_OPTIONS = [
+  '#4c6ef5',
+  '#845ef7',
+  '#f59f00',
+  '#f97316',
+  '#34d399',
+  '#10b981',
+  '#0ea5e9',
+  '#6366f1',
+  '#ec4899',
+  '#ef4444',
+  '#14b8a6',
+  '#2dd4bf',
+  '#3b82f6',
+  '#8b5cf6',
+  '#f472b6',
+  '#fb923c',
+  '#22c55e',
+  '#a855f7',
+  '#f43f5e',
+  '#0f172a',
+];
+
+const DEFAULT_COLOR = COLOR_OPTIONS[0];
 
 const initialForm = {
   url: '',
   type: 'true',
   label: '',
+  color: DEFAULT_COLOR,
 };
 
 const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
@@ -24,6 +50,17 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
   const [typeDraft, setTypeDraft] = useState('true');
   const [calendarSavingId, setCalendarSavingId] = useState(null);
   const [calendarEditError, setCalendarEditError] = useState(null);
+  const [colorDraft, setColorDraft] = useState(DEFAULT_COLOR);
+  const [createColorPickerOpen, setCreateColorPickerOpen] = useState(false);
+
+  const colorUsage = useMemo(() => {
+    const counts = {};
+    calendars.forEach((calendar) => {
+      const key = calendar.color || DEFAULT_COLOR;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [calendars]);
 
   useEffect(() => {
     setModulesCache({});
@@ -33,6 +70,8 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
     setLabelDraft('');
     setTypeDraft('true');
     setCalendarEditError(null);
+    setColorDraft(DEFAULT_COLOR);
+    setCreateColorPickerOpen(false);
   }, [projectId]);
 
   const handleChange = (event) => {
@@ -44,6 +83,7 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
     setEditingCalendarId(calendar.calendar_id);
     setLabelDraft(calendar.label || '');
     setTypeDraft(calendar.type ? 'true' : 'false');
+    setColorDraft(calendar.color || DEFAULT_COLOR);
     setCalendarEditError(null);
   };
 
@@ -52,6 +92,7 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
     setLabelDraft('');
     setTypeDraft('true');
     setCalendarEditError(null);
+    setColorDraft(DEFAULT_COLOR);
   };
 
   const saveCalendarDetails = async (calendarId) => {
@@ -62,12 +103,14 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
       await calendarApi.update(projectId, calendarId, {
         label: trimmed.length ? trimmed : null,
         type: typeDraft === 'true',
+        color: colorDraft,
       });
       setFeedback('Calendrier mis à jour.');
       await onRefresh();
       setEditingCalendarId(null);
       setLabelDraft('');
       setTypeDraft('true');
+      setColorDraft('#4c6ef5');
     } catch (error) {
       setCalendarEditError(error.message);
     } finally {
@@ -85,8 +128,10 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
         url: form.url,
         type: form.type === 'true',
         label: form.label || undefined,
+        color: form.color || DEFAULT_COLOR,
       });
       setForm(initialForm);
+      setCreateColorPickerOpen(false);
       setFeedback('Calendrier ajouté avec succès (et synchronisé).');
       await onRefresh();
     } catch (error) {
@@ -232,6 +277,45 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
               <option value="false">Type 2 · nouveaux modules décochés</option>
             </select>
           </label>
+          <label className="form-field">
+            <span>Couleur</span>
+            <div className="color-picker-inline">
+              <button
+                type="button"
+                className="color-swatch"
+                style={{ backgroundColor: form.color }}
+                onClick={() => setCreateColorPickerOpen((prev) => !prev)}
+              >
+                🎨
+              </button>
+              {createColorPickerOpen ? (
+                <div className="color-picker color-picker--floating">
+                  {COLOR_OPTIONS.map((color) => {
+                    const usageCount = colorUsage[color] || 0;
+                    const isSelected = form.color === color;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-swatch ${isSelected ? 'is-selected' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            color,
+                          }));
+                          setCreateColorPickerOpen(false);
+                        }}
+                      >
+                        <span className="color-swatch__check">{isSelected ? '✓' : ''}</span>
+                        <span className="color-swatch__count">{usageCount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </label>
           <label className="form-field grid-span-3">
             <span>Label (optionnel)</span>
             <input
@@ -303,6 +387,31 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
                               <option value="false">Type 2 · nouveaux modules décochés</option>
                             </select>
                           </label>
+                          <label className="label-editor__field">
+                            <span>Couleur</span>
+                            <div className="color-picker color-picker--compact">
+                              {COLOR_OPTIONS.map((color) => {
+                                const usageCount = Math.max(
+                                  0,
+                                  (colorUsage[color] || 0) - (calendar.color === color ? 1 : 0),
+                                );
+                                const isSelected = colorDraft === color;
+                                return (
+                                  <button
+                                    key={color}
+                                    type="button"
+                                    className={`color-swatch ${isSelected ? 'is-selected' : ''}`}
+                                    style={{ backgroundColor: color }}
+                                    onClick={() => setColorDraft(color)}
+                                    disabled={calendarSavingId === calendar.calendar_id}
+                                  >
+                                    <span className="color-swatch__check">{isSelected ? '✓' : ''}</span>
+                                    <span className="color-swatch__count">{usageCount}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </label>
                           <div className="label-editor__actions">
                             <button
                               type="button"
@@ -329,7 +438,14 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
                         </div>
                       ) : (
                         <>
-                          <h4>{calendar.label || calendar.url}</h4>
+                          <div className="calendar-title-row">
+                            <h4>{calendar.label || calendar.url}</h4>
+                          <div
+                            className="calendar-color-chip"
+                            style={{ backgroundColor: calendar.color || DEFAULT_COLOR }}
+                            title={`Couleur : ${calendar.color || DEFAULT_COLOR}`}
+                          />
+                          </div>
                           <button
                             type="button"
                             className="btn btn-link"

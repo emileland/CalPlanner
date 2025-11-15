@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS calendars (
     url TEXT NOT NULL,
     type BOOLEAN NOT NULL DEFAULT TRUE,
     label TEXT,
+    color TEXT,
     last_synced TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

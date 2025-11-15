@@ -14,6 +14,7 @@ const ProjectsPage = () => {
   const setProjects = useProjectStore((state) => state.setProjects);
   const prependProject = useProjectStore((state) => state.prependProject);
   const selectProject = useProjectStore((state) => state.selectProject);
+  const removeProject = useProjectStore((state) => state.removeProject);
 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -22,6 +23,7 @@ const ProjectsPage = () => {
   const [formError, setFormError] = useState(null);
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const navigate = useNavigate();
 
@@ -69,6 +71,21 @@ const ProjectsPage = () => {
   const handleSelect = (project) => {
     selectProject(project);
     navigate(`/app/projects/${project.project_id}`);
+  };
+
+  const handleDelete = async (projectId) => {
+    if (!window.confirm('Supprimer ce projet ? Cette action est définitive.')) {
+      return;
+    }
+    setDeletingId(projectId);
+    try {
+      await projectApi.remove(projectId);
+      removeProject(projectId);
+    } catch (error) {
+      setFetchError(error.message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleImportConfig = async (event) => {
@@ -177,9 +194,19 @@ const ProjectsPage = () => {
                     {project.end_date ? `au ${new Date(project.end_date).toLocaleDateString()}` : ''}
                   </p>
                 </div>
-                <button type="button" className="btn btn-secondary" onClick={() => handleSelect(project)}>
-                  Ouvrir
-                </button>
+                <div className="card-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => handleSelect(project)}>
+                    Ouvrir
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => handleDelete(project.project_id)}
+                    disabled={deletingId === project.project_id}
+                  >
+                    {deletingId === project.project_id ? 'Suppression...' : 'Supprimer'}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

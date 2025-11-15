@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { projectApi } from '../api/client.js';
 import { useProjectStore } from '../store/projectStore.js';
 
@@ -6,6 +7,9 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
   const updateProjectInStore = useProjectStore((state) => state.updateProject);
+  const removeProjectFromStore = useProjectStore((state) => state.removeProject);
+  const clearSelection = useProjectStore((state) => state.clearSelection);
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '',
     start_date: '',
@@ -22,6 +26,7 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
   const [configFeedback, setConfigFeedback] = useState(null);
   const [configError, setConfigError] = useState(null);
   const [exportingConfig, setExportingConfig] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
 
   useEffect(() => {
     if (project) {
@@ -136,6 +141,24 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!window.confirm('Supprimer ce projet et toutes ses données ?')) {
+      return;
+    }
+    setDeletingProject(true);
+    setError(null);
+    try {
+      await projectApi.remove(project.project_id);
+      removeProjectFromStore(project.project_id);
+      clearSelection();
+      navigate('/app/projects');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingProject(false);
+    }
+  };
+
   const handleExportConfig = async () => {
     setExportingConfig(true);
     setConfigError(null);
@@ -232,6 +255,16 @@ const ProjectSettingsTab = ({ project, onProjectUpdated }) => {
         {configFeedback ? <p className="alert alert-success">{configFeedback}</p> : null}
         <button type="button" className="btn btn-secondary" onClick={handleExportConfig} disabled={exportingConfig}>
           {exportingConfig ? 'Export en cours...' : 'Exporter la configuration (.json)'}
+        </button>
+      </section>
+
+      <section className="panel panel-danger">
+        <h3>Supprimer le projet</h3>
+        <p className="text-muted">
+          Cette action supprime le projet, ses calendriers et événements associés. Elle est irréversible.
+        </p>
+        <button type="button" className="btn btn-ghost" onClick={handleDeleteProject} disabled={deletingProject}>
+          {deletingProject ? 'Suppression...' : 'Supprimer définitivement'}
         </button>
       </section>
     </div>

@@ -15,6 +15,10 @@ router
       body('url').isURL().withMessage('URL du calendrier invalide'),
       body('type').isBoolean().withMessage('type doit être booléen'),
       body('label').optional().isLength({ min: 2 }).withMessage('Le libellé est trop court'),
+      body('color')
+        .optional({ nullable: true })
+        .matches(/^#([0-9A-Fa-f]{6})$/)
+        .withMessage('Couleur invalide'),
     ],
     validate,
     calendarController.create,
@@ -44,6 +48,10 @@ router
         .isBoolean()
         .withMessage('type doit être booléen')
         .toBoolean(),
+      body('color')
+        .optional({ nullable: true })
+        .matches(/^#([0-9A-Fa-f]{6})$/)
+        .withMessage('Couleur invalide'),
     ],
     validate,
     calendarController.update,

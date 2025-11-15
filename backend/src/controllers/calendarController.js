@@ -11,6 +11,7 @@ const create = asyncHandler(async (req, res) => {
     url: req.body.url,
     type: req.body.type,
     label: req.body.label,
+    color: req.body.color,
   });
   res.status(201).json(calendar);
 });
@@ -27,6 +28,9 @@ const update = asyncHandler(async (req, res) => {
   }
   if (Object.prototype.hasOwnProperty.call(req.body, 'type')) {
     payload.type = req.body.type;
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body, 'color')) {
+    payload.color = req.body.color;
   }
   const calendar = await calendarService.updateDetails(req.calendar.calendar_id, payload);
   res.json(calendar);

@@ -11,13 +11,20 @@ const DashboardLayout = () => {
     navigate('/login');
   };
 
+  const navClassName = ({ isActive }) => (isActive ? 'app-nav__link is-active' : 'app-nav__link');
+
   return (
     <div className="app-shell">
       <header className="app-shell__header">
-        <div>
+        <div className="app-header__brand">
           <p className="logo-text">CalPlanner</p>
           <p className="logo-subtitle">Optimisez vos semaines en un clin d’œil</p>
         </div>
+        <nav className="app-nav">
+          <NavLink to="/app/projects" className={navClassName}>
+            Mes projets
+          </NavLink>
+        </nav>
         <div className="header-actions">
           <p className="user-chip">
             <span className="user-chip__name">{user?.username}</span>
@@ -29,16 +36,9 @@ const DashboardLayout = () => {
         </div>
       </header>
 
-      <div className="app-shell__body">
-        <aside className="sidebar">
-          <NavLink to="/app/projects" className={({ isActive }) => (isActive ? 'sidebar-link active' : 'sidebar-link')}>
-            Mes projets
-          </NavLink>
-        </aside>
-        <main className="app-shell__content">
-          <Outlet />
-        </main>
-      </div>
+      <main className="app-shell__content">
+        <Outlet />
+      </main>
     </div>
   );
 };

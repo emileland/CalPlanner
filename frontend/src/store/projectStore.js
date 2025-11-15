@@ -18,6 +18,12 @@ export const useProjectStore = create((set) => ({
           ? updated
           : state.selectedProject,
     })),
+  removeProject: (id) =>
+    set((state) => ({
+      projects: state.projects.filter((project) => project.project_id !== id),
+      selectedProject:
+        state.selectedProject && state.selectedProject.project_id === id ? null : state.selectedProject,
+    })),
   selectProject: (project) => set({ selectedProject: project }),
   clearSelection: () => set({ selectedProject: null }),
 }));
