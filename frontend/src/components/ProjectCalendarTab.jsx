@@ -183,17 +183,17 @@ const ProjectCalendarTab = ({
               color: extendedProps.color,
             });
           }}
+          eventDidMount={(info) => {
+            const color = info.event.extendedProps.color || '#4c6ef5';
+            info.el.style.backgroundColor = color;
+            info.el.style.borderColor = color;
+            info.el.style.color = getReadableTextColor(color);
+          }}
           datesSet={(arg) => {
             lastVisibleRange.current = { start: arg.start, end: arg.end };
             loadEvents({ start: arg.start, end: arg.end });
           }}
         />
-        eventDidMount={(info) => {
-          const color = info.event.extendedProps.color || '#4c6ef5';
-          info.el.style.backgroundColor = color;
-          info.el.style.borderColor = color;
-          info.el.style.color = getReadableTextColor(color);
-        }}
         {loadingRange ? <div className="calendar-overlay">Mise à jour du planning…</div> : null}
       </div>
       {selectedEvent ? (

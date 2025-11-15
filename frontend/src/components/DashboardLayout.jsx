@@ -18,7 +18,6 @@ const DashboardLayout = () => {
       <header className="app-shell__header">
         <div className="app-header__brand">
           <p className="logo-text">CalPlanner</p>
-          <p className="logo-subtitle">Optimisez vos semaines en un clin d’œil</p>
         </div>
         <nav className="app-nav">
           <NavLink to="/app/projects" className={navClassName}>
