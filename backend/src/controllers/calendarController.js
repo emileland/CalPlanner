@@ -20,6 +20,18 @@ const remove = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const update = asyncHandler(async (req, res) => {
+  const payload = {};
+  if (Object.prototype.hasOwnProperty.call(req.body, 'label')) {
+    payload.label = req.body.label;
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body, 'type')) {
+    payload.type = req.body.type;
+  }
+  const calendar = await calendarService.updateDetails(req.calendar.calendar_id, payload);
+  res.json(calendar);
+});
+
 const sync = asyncHandler(async (req, res) => {
   const payload = await calendarService.sync(req.calendar.calendar_id);
   res.json(payload);
@@ -29,5 +41,6 @@ module.exports = {
   list,
   create,
   remove,
+  update,
   sync,
 };

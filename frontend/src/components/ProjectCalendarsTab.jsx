@@ -17,15 +17,62 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
   const [modulesLoadingId, setModulesLoadingId] = useState(null);
   const [modulesError, setModulesError] = useState(null);
   const [busyCalendar, setBusyCalendar] = useState(null);
+  const [moduleFilters, setModuleFilters] = useState({});
+  const [bulkActionCalendarId, setBulkActionCalendarId] = useState(null);
+  const [editingCalendarId, setEditingCalendarId] = useState(null);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [typeDraft, setTypeDraft] = useState('true');
+  const [calendarSavingId, setCalendarSavingId] = useState(null);
+  const [calendarEditError, setCalendarEditError] = useState(null);
 
   useEffect(() => {
     setModulesCache({});
     setExpandedId(null);
+    setModuleFilters({});
+    setEditingCalendarId(null);
+    setLabelDraft('');
+    setTypeDraft('true');
+    setCalendarEditError(null);
   }, [projectId]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const startCalendarEdit = (calendar) => {
+    setEditingCalendarId(calendar.calendar_id);
+    setLabelDraft(calendar.label || '');
+    setTypeDraft(calendar.type ? 'true' : 'false');
+    setCalendarEditError(null);
+  };
+
+  const cancelCalendarEdit = () => {
+    setEditingCalendarId(null);
+    setLabelDraft('');
+    setTypeDraft('true');
+    setCalendarEditError(null);
+  };
+
+  const saveCalendarDetails = async (calendarId) => {
+    setCalendarEditError(null);
+    setCalendarSavingId(calendarId);
+    try {
+      const trimmed = labelDraft.trim();
+      await calendarApi.update(projectId, calendarId, {
+        label: trimmed.length ? trimmed : null,
+        type: typeDraft === 'true',
+      });
+      setFeedback('Calendrier mis à jour.');
+      await onRefresh();
+      setEditingCalendarId(null);
+      setLabelDraft('');
+      setTypeDraft('true');
+    } catch (error) {
+      setCalendarEditError(error.message);
+    } finally {
+      setCalendarSavingId(null);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -135,6 +182,31 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
     }
   };
 
+  const toggleAllModules = async (calendarId, shouldSelect) => {
+    setModulesError(null);
+    setBulkActionCalendarId(calendarId);
+    setBusyCalendar(calendarId);
+    try {
+      const updatedModules = await moduleApi.setAll(projectId, calendarId, shouldSelect);
+      setModulesCache((prev) => ({
+        ...prev,
+        [calendarId]: updatedModules,
+      }));
+    } catch (error) {
+      setModulesError(error.message);
+    } finally {
+      setBulkActionCalendarId(null);
+      setBusyCalendar(null);
+    }
+  };
+
+  const handleModuleFilterChange = (calendarId, value) => {
+    setModuleFilters((prev) => ({
+      ...prev,
+      [calendarId]: value,
+    }));
+  };
+
   return (
     <div className="calendar-manager">
       <section className="panel">
@@ -154,10 +226,10 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
             />
           </label>
           <label className="form-field">
-            <span>Mode</span>
+            <span>Type de sélection</span>
             <select name="type" value={form.type} onChange={handleChange}>
-              <option value="true">Inclusif (on coche ce qui est affiché)</option>
-              <option value="false">Exclusif (on décoche pour masquer)</option>
+              <option value="true">Type 1 · nouveaux modules cochés</option>
+              <option value="false">Type 2 · nouveaux modules décochés</option>
             </select>
           </label>
           <label className="form-field grid-span-3">
@@ -187,14 +259,91 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
             {calendars.map((calendar) => {
               const isBusy = busyCalendar === calendar.calendar_id;
               const modules = modulesCache[calendar.calendar_id];
+              const searchQuery = moduleFilters[calendar.calendar_id] || '';
+              const normalizedQuery = searchQuery.trim().toLowerCase();
+              const filteredModules =
+                modules && normalizedQuery
+                  ? modules.filter((module) =>
+                      module.name.toLowerCase().includes(normalizedQuery),
+                    )
+                  : modules;
+              const totalModules = modules ? modules.length : 0;
+              const selectedModules = filteredModules
+                ? filteredModules.filter((module) => module.is_selected)
+                : [];
+              const unselectedModules = filteredModules
+                ? filteredModules.filter((module) => !module.is_selected)
+                : [];
+              const totalSelected = modules ? modules.filter((module) => module.is_selected).length : 0;
+              const isBulkUpdating = bulkActionCalendarId === calendar.calendar_id;
               return (
                 <li key={calendar.calendar_id} className="calendar-item">
                   <header>
-                    <div>
-                      <h4>{calendar.label || calendar.url}</h4>
+                    <div className="calendar-title-block">
+                      {editingCalendarId === calendar.calendar_id ? (
+                        <div className="label-editor">
+                          <label className="label-editor__field">
+                            <span>Label</span>
+                            <input
+                              type="text"
+                              value={labelDraft}
+                              onChange={(event) => setLabelDraft(event.target.value)}
+                              placeholder="Nouveau label"
+                              disabled={calendarSavingId === calendar.calendar_id}
+                            />
+                          </label>
+                          <label className="label-editor__field">
+                            <span>Type de sélection</span>
+                            <select
+                              value={typeDraft}
+                              onChange={(event) => setTypeDraft(event.target.value)}
+                              disabled={calendarSavingId === calendar.calendar_id}
+                            >
+                              <option value="true">Type 1 · nouveaux modules cochés</option>
+                              <option value="false">Type 2 · nouveaux modules décochés</option>
+                            </select>
+                          </label>
+                          <div className="label-editor__actions">
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => saveCalendarDetails(calendar.calendar_id)}
+                              disabled={calendarSavingId === calendar.calendar_id}
+                            >
+                              {calendarSavingId === calendar.calendar_id
+                                ? 'Enregistrement…'
+                                : 'Enregistrer'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-link"
+                              onClick={cancelCalendarEdit}
+                              disabled={calendarSavingId === calendar.calendar_id}
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                          {calendarEditError ? (
+                            <p className="alert alert-error">{calendarEditError}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <>
+                          <h4>{calendar.label || calendar.url}</h4>
+                          <button
+                            type="button"
+                            className="btn btn-link"
+                            onClick={() => startCalendarEdit(calendar)}
+                          >
+                            Modifier le label / type
+                          </button>
+                        </>
+                      )}
                       <p className="text-muted">
-                        {calendar.type ? 'Mode inclusif' : 'Mode exclusif'} ·{' '}
-                        {calendar.module_count} modules détectés
+                        {calendar.type
+                          ? 'Type 1 · nouveaux modules cochés automatiquement'
+                          : 'Type 2 · nouveaux modules décochés automatiquement'}{' '}
+                        · {calendar.module_count} modules détectés
                       </p>
                       <p className="text-muted">
                         Dernière synchro:{' '}
@@ -236,36 +385,123 @@ const ProjectCalendarsTab = ({ projectId, calendars, onRefresh }) => {
                       {modulesLoadingId === calendar.calendar_id && !modules ? (
                         <p className="text-muted">Chargement des modules…</p>
                       ) : null}
+                      {modules ? (
+                        <div className="module-toolbar">
+                          <input
+                            type="search"
+                            placeholder="Rechercher un module"
+                            value={searchQuery}
+                            onChange={(event) =>
+                              handleModuleFilterChange(calendar.calendar_id, event.target.value)
+                            }
+                          />
+                          <div className="module-bulk-actions">
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => toggleAllModules(calendar.calendar_id, true)}
+                              disabled={!modules.length || isBulkUpdating}
+                            >
+                              Tout cocher
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => toggleAllModules(calendar.calendar_id, false)}
+                              disabled={!modules.length || isBulkUpdating}
+                            >
+                              Tout décocher
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                       {modules && !modules.length ? (
                         <p className="text-muted">Aucun module détecté pour l’instant.</p>
                       ) : null}
-                      {modules ? (
-                        <ul className="module-list">
-                          {modules.map((module) => (
-                            <li key={module.module_id}>
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={module.is_selected}
-                                  onChange={(event) =>
-                                    toggleModule(
-                                      calendar.calendar_id,
-                                      module.module_id,
-                                      event.target.checked,
-                                    )
-                                  }
-                                  disabled={busyCalendar === `${calendar.calendar_id}-${module.module_id}`}
-                                />
-                                <span>{module.name}</span>
-                              </label>
-                            </li>
-                          ))}
-                        </ul>
+                      {modules && normalizedQuery && !filteredModules.length ? (
+                        <p className="text-muted">Aucun module ne correspond à votre recherche.</p>
+                      ) : null}
+                      {filteredModules && filteredModules.length ? (
+                        <>
+                          <div className="module-summary">
+                            <span>
+                              {totalSelected} module{totalSelected > 1 ? 's' : ''} cochés sur{' '}
+                              {totalModules}
+                            </span>
+                            <span>{filteredModules.length} correspondent à votre recherche.</span>
+                          </div>
+                          <div className="module-stack">
+                            <div className="module-group">
+                              <p className="module-column-title">Modules cochés</p>
+                              {selectedModules.length ? (
+                                <ul className="module-list">
+                                  {selectedModules.map((module) => (
+                                    <li key={module.module_id}>
+                                      <label>
+                                        <input
+                                          type="checkbox"
+                                          checked
+                                          onChange={(event) =>
+                                            toggleModule(
+                                              calendar.calendar_id,
+                                              module.module_id,
+                                              event.target.checked,
+                                            )
+                                          }
+                                          disabled={
+                                            busyCalendar ===
+                                              `${calendar.calendar_id}-${module.module_id}` ||
+                                            isBulkUpdating
+                                          }
+                                        />
+                                        <span>{module.name}</span>
+                                      </label>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-muted small">Aucun module coché.</p>
+                              )}
+                            </div>
+                            <div className="module-group">
+                              <p className="module-column-title">Modules décochés</p>
+                              {unselectedModules.length ? (
+                                <ul className="module-list">
+                                  {unselectedModules.map((module) => (
+                                    <li key={module.module_id}>
+                                      <label>
+                                        <input
+                                          type="checkbox"
+                                          checked={false}
+                                          onChange={(event) =>
+                                            toggleModule(
+                                              calendar.calendar_id,
+                                              module.module_id,
+                                              event.target.checked,
+                                            )
+                                          }
+                                          disabled={
+                                            busyCalendar ===
+                                              `${calendar.calendar_id}-${module.module_id}` ||
+                                            isBulkUpdating
+                                          }
+                                        />
+                                        <span>{module.name}</span>
+                                      </label>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-muted small">Aucun module décoché.</p>
+                              )}
+                            </div>
+                          </div>
+                        </>
                       ) : null}
                       <p className="text-muted explanation">
                         {calendar.type
-                          ? 'Mode inclusif : seuls les modules cochés seront visibles.'
-                          : 'Mode exclusif : tous les modules sont visibles sauf ceux décochés.'}
+                          ? 'Type 1 : les nouveaux modules sont cochés par défaut. Seuls les modules cochés apparaissent dans le planning.'
+                          : 'Type 2 : les nouveaux modules sont décochés par défaut. Seuls les modules cochés apparaissent dans le planning.'}
                       </p>
                     </div>
                   ) : null}

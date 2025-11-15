@@ -36,8 +36,20 @@ const setSelection = async (moduleId, isSelected) => {
   return rows[0];
 };
 
+const setSelectionForCalendar = async (calendarId, isSelected) => {
+  const { rows } = await query(
+    `UPDATE modules
+     SET is_selected = $1
+     WHERE calendar_id = $2
+     RETURNING module_id, calendar_id, name, is_selected, created_at`,
+    [isSelected, calendarId],
+  );
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
+};
+
 module.exports = {
   listByCalendar,
   getById,
   setSelection,
+  setSelectionForCalendar,
 };

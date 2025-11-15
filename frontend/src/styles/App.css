@@ -342,6 +342,11 @@ button {
   margin-top: 0.25rem;
 }
 
+.text-muted.small {
+  font-size: 0.85rem;
+  margin-top: 0;
+}
+
 .empty-state {
   margin: 1rem 0 0 0;
   color: #94a3b8;
@@ -393,6 +398,92 @@ button {
   border-radius: 20px;
 }
 
+.event-chip {
+  display: flex;
+  padding: 0.25rem 0.4rem;
+}
+
+.event-chip--compact {
+  justify-content: center;
+  align-items: center;
+}
+
+.event-chip__module {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 50;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: min(500px, 90vw);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.modal-card__kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6366f1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.modal-card__header h4 {
+  margin: 0.2rem 0 0 0;
+}
+
+.modal-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modal-close {
+  padding: 0.2rem 0.5rem;
+}
+
+.event-detail {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.event-description p {
+  margin: 0.15rem 0 0 0;
+  color: #334155;
+}
+
+.event-description {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
 .calendar-list {
   list-style: none;
   padding: 0;
@@ -416,6 +507,47 @@ button {
   flex-wrap: wrap;
 }
 
+.calendar-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.label-editor__field span {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+.label-editor input[type='text'],
+.label-editor select {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  background: white;
+}
+
+.label-editor__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .calendar-actions {
   display: flex;
   gap: 0.5rem;
@@ -429,13 +561,70 @@ button {
   padding-top: 1rem;
 }
 
+.module-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.module-toolbar input[type='search'] {
+  flex: 1 1 240px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  background: white;
+}
+
+.module-bulk-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.module-bulk-actions .btn {
+  padding: 0.5rem 1.25rem;
+}
+
+.module-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.module-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.module-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.module-column-title {
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+}
+
 .module-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .module-list label {

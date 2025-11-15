@@ -25,7 +25,29 @@ router.post('/:calendarId/sync', withCalendar, calendarController.sync);
 router
   .route('/:calendarId')
   .all(withCalendar)
-  .delete(calendarController.remove);
+  .delete(calendarController.remove)
+  .patch(
+    [
+      body('label')
+        .customSanitizer((value) => {
+          if (typeof value !== 'string') {
+            return null;
+          }
+          const trimmed = value.trim();
+          return trimmed.length ? trimmed : null;
+        })
+        .optional({ nullable: true })
+        .isLength({ min: 2 })
+        .withMessage('Le libellé est trop court'),
+      body('type')
+        .optional()
+        .isBoolean()
+        .withMessage('type doit être booléen')
+        .toBoolean(),
+    ],
+    validate,
+    calendarController.update,
+  );
 
 router.use('/:calendarId/modules', withCalendar, moduleRoutes);
 

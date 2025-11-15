@@ -9,7 +9,7 @@ const features = [
   {
     title: 'Filtrer vos modules',
     description:
-      'Sélectionnez les cours à conserver selon le mode inclusif/exclusif pour vous concentrer sur l’essentiel.',
+      'Choisissez entre le type 1 (nouveaux modules cochés) ou le type 2 (nouveaux modules décochés) et n’affichez que ceux réellement sélectionnés.',
   },
   {
     title: 'Vue calendrier ergonomique',

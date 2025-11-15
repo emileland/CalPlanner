@@ -65,8 +65,7 @@ const listEvents = async (projectId, { viewStart, viewEnd }) => {
         e.module_id,
         m.name AS module_name,
         m.is_selected,
-        c.calendar_id,
-        c.type
+        c.calendar_id
      FROM events e
      JOIN modules m ON e.module_id = m.module_id
      JOIN calendars c ON m.calendar_id = c.calendar_id
@@ -80,8 +79,7 @@ const listEvents = async (projectId, { viewStart, viewEnd }) => {
 
   return rows
     .filter((event) => {
-      const include = event.type ? event.is_selected : !event.is_selected;
-      if (!include) {
+      if (!event.is_selected) {
         return false;
       }
       const startDate = new Date(event.start_time);

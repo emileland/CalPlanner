@@ -6,7 +6,14 @@ const { withModule } = require('../middleware/moduleContext');
 
 const router = express.Router({ mergeParams: true });
 
-router.get('/', moduleController.list);
+router
+  .route('/')
+  .get(moduleController.list)
+  .patch(
+    [body('isSelected').isBoolean().withMessage('isSelected doit être booléen')],
+    validate,
+    moduleController.updateSelectionBulk,
+  );
 
 router.patch(
   '/:moduleId',

@@ -89,6 +89,11 @@ export const calendarApi = {
       method: 'POST',
       body: payload,
     }),
+  update: (projectId, calendarId, payload) =>
+    request(`/projects/${projectId}/calendars/${calendarId}`, {
+      method: 'PATCH',
+      body: payload,
+    }),
   remove: (projectId, calendarId) =>
     request(`/projects/${projectId}/calendars/${calendarId}`, {
       method: 'DELETE',
@@ -102,6 +107,11 @@ export const calendarApi = {
 export const moduleApi = {
   list: (projectId, calendarId) =>
     request(`/projects/${projectId}/calendars/${calendarId}/modules`),
+  setAll: (projectId, calendarId, isSelected) =>
+    request(`/projects/${projectId}/calendars/${calendarId}/modules`, {
+      method: 'PATCH',
+      body: { isSelected },
+    }),
   toggle: (projectId, calendarId, moduleId, isSelected) =>
     request(`/projects/${projectId}/calendars/${calendarId}/modules/${moduleId}`, {
       method: 'PATCH',

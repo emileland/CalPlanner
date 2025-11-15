@@ -57,6 +57,43 @@ const remove = async (calendarId) => {
   await query('DELETE FROM calendars WHERE calendar_id = $1', [calendarId]);
 };
 
+const updateDetails = async (calendarId, { label, type } = {}) => {
+  const fields = [];
+  const values = [];
+  let index = 1;
+
+  if (label !== undefined) {
+    fields.push(`label = $${index}`);
+    values.push(label);
+    index += 1;
+  }
+  if (typeof type === 'boolean') {
+    fields.push(`type = $${index}`);
+    values.push(type);
+    index += 1;
+  }
+
+  if (!fields.length) {
+    const calendar = await getById(calendarId);
+    if (!calendar) {
+      throw new ApiError(404, 'Calendrier introuvable');
+    }
+    return calendar;
+  }
+
+  const { rows } = await query(
+    `UPDATE calendars
+     SET ${fields.join(', ')}
+     WHERE calendar_id = $${index}
+     RETURNING calendar_id, project_id, url, type, label, last_synced, created_at`,
+    [...values, calendarId],
+  );
+  if (!rows.length) {
+    throw new ApiError(404, 'Calendrier introuvable');
+  }
+  return rows[0];
+};
+
 const sync = async (calendarId) => {
   const calendar = await getById(calendarId);
   if (!calendar) {
@@ -154,5 +191,6 @@ module.exports = {
   getById,
   create,
   remove,
+  updateDetails,
   sync,
 };

@@ -11,7 +11,16 @@ const updateSelection = asyncHandler(async (req, res) => {
   res.json(module);
 });
 
+const updateSelectionBulk = asyncHandler(async (req, res) => {
+  const modules = await moduleService.setSelectionForCalendar(
+    req.calendar.calendar_id,
+    req.body.isSelected,
+  );
+  res.json(modules);
+});
+
 module.exports = {
   list,
   updateSelection,
+  updateSelectionBulk,
 };
