@@ -1,0 +1,10 @@
+# Remplace par ton vrai domaine
+raspiland.emileland.fr {
+    encode gzip
+
+    # Proxy /api vers le backend
+    reverse_proxy /api* backend:4000
+
+    # Le reste vers le frontend (Nginx)
+    reverse_proxy frontend:80
+}
