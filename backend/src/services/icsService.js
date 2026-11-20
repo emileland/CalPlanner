@@ -3,17 +3,7 @@ const ical = require('node-ical');
 const ApiError = require('../utils/ApiError');
 
 const extractModuleName = (summary = '') => {
-  const cleaned = summary.replace(/\s+/g, ' ').trim();
-  if (!cleaned) {
-    return 'Module';
-  }
-  const separators = [' - ', '-', ':', '|'];
-  for (const separator of separators) {
-    if (cleaned.includes(separator)) {
-      return cleaned.split(separator)[0].trim();
-    }
-  }
-  return cleaned;
+  return summary.replace(/\s+/g, ' ').trim() || 'Module';
 };
 
 const fetchIcsBody = async (url) => {
